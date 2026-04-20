@@ -1,0 +1,36 @@
+services:
+
+  # relational store
+  pg_app:
+    image: postgres:17-bookworm
+    container_name: pg_app
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: app_user
+      POSTGRES_PASSWORD: app_pass
+      POSTGRES_DB: app_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_app_data:/var/lib/postgresql/data
+      - ./init/app:/docker-entrypoint-initdb.d
+
+  # separate Postgres runtime specialised with the TimescaleDB image (packaged as a Postgres Extension)
+  # there is now latest tag, so pinning a concret tag is the safer habit
+  pg_metrics:
+    image: timescale/timescaledb:2.23.0-pg17
+    container_name: pg_metrics
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: metrics_user
+      POSTGRES_PASSWORD: metrics_pass
+      POSTGRES_DB: metrics_db
+    ports:
+      - "5433:5432" # separate ports 5432 and 5433 so both run locally at the same time
+    volumes:
+      - pg_metrics_data:/var/lib/postgresql/data
+      - ./init/metrics:/docker-entrypoint-initdb.d
+
+volumes:
+  pg_app_data:
+  pg_metrics_data:
