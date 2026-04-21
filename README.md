@@ -11,11 +11,15 @@ Its extensibility makes it powerful as it enables support for multi-workload pat
 
 The instinct to reach for a specialised system (e.g. Elasticsearch for search, Redis for caching, InfluxDB for time-series) is often premature. PostgreSQL's extensibility makes it capable of handling most of these workloads natively (at the cost of intentional design choices around indexing, schema layout, and query planning).
 
-Before jumping into implementation, it is therefore important to take the time to lay out a coherent data modelling layer. Data Modelling occurs in three main layers:
-- conceptual
-- logical
-- physical
-each representing a progression from high-level business concepts to technical database implementation. In this reference, the physical constraints chosen inherits from Postgres's benefits and limitations.
+Before jumping into implementation, it is therefore always important to take the time to lay out a coherent data modelling layer.
+
+Data Modelling occurs in three main layers:
+
+- conceptual (what you want the system to achieve)
+- logical (e.g. in the form of LLM prompts / output schemas)
+- physical (e.g. enforced via Postgres table schema)
+
+each representing a progression from high-level business concepts to technical database implementation. In this reference, the physical constraints map directly to Postgres's own benefits (everything is queryable) and limitations (scale).
 
 These layers define how data is structured, stored and utilized, ensuring data integrity and alignement with business goals.
 
@@ -32,6 +36,238 @@ Instead of introducing multiple systems prematurely, many workloads can be handl
 | **Text search**               | `tsvector` + GIN / `pg_trgm` for similarity matching and misspellings tolerance |
 
 These are not separate databases, but different access patterns running on the same engine. Each demanding a different index structure and schema contract.
+
+# LLM-Driven Development and Ownership (A Systems Perspective)
+
+## Context
+
+As Large Language Models (LLMs) become deeply integrated into software development workflows, they fundamentally change how code is produced. Code generation is no longer constrained by human effort, but by review capacity, system design, and control mechanisms.
+
+This introduces a concern that feels new but is not: loss of ownership over parts of the codebase.
+
+In reality, this is not a new problem. It is an old structural property of software systems that is now amplified.
+
+## The Illusion of Full Ownership
+
+There is a common but flawed assumption in engineering:
+
+> To own a system, you must understand all of its code.
+
+This has never been true at scale.
+
+Even before LLMs:
+- Large systems were composed of modules no single person fully understood
+- Teams relied on division of ownership
+- Knowledge was always partial and distributed
+
+What LLMs change is not the nature of ownership, but the **rate at which knowledge gaps appear**.
+
+Where before knowledge drift was gradual and localized, it is now:
+- immediate
+- system-wide
+- often invisible
+- and now mostly de-synchronized from human cognition limits.
+
+## What LLMs Actually Change
+
+LLMs remove the natural friction of software development.
+
+They allow:
+- close to infinite and near-instant code generation
+- rapid iteration
+- expansion of codebases beyond human cognitive limits
+
+But they do not increase:
+- understanding
+- validation capacity
+- system awareness
+
+This creates an imbalance:
+
+- Code volume grows faster than comprehension
+- Surface-level correctness replaces deep correctness
+- Implicit assumptions multiply
+
+The result is not just technical debt, but **loss of system predictability**.
+
+## A More Accurate Mental Model
+
+Instead of thinking:
+
+> "I am writing and owning code"
+
+You must shift to:
+
+> "I am operating a system that produces code"
+
+LLMs behave like a team of extremely fast junior engineers:
+- highly productive
+- syntactically correct
+- lacking accountability and system awareness
+
+The role is no longer to produce code, but to **constrain and validate what gets produced**.
+
+## How Ownership Was Maintained Traditionally
+
+Well-functioning engineering organizations never relied on total understanding. Instead, they relied on control structures:
+
+- Clear boundaries of responsibility (services, domains, modules)
+- Contracts defining expected behaviour (APIs, schemas)
+- Testing to enforce invariants
+- Code reviews to maintain alignment
+- Observability to detect deviations in production
+
+Ownership was not about knowing everything, but about ensuring the system behaved within defined expectations.
+
+## What Breaks at Scale with LLMs
+
+At small scale, LLM-generated code feels like acceleration.
+
+At larger scale, it introduces systemic risks:
+
+- Hidden coupling between components
+- Undetected violations of assumptions
+- Increasing difficulty in debugging
+- Cost explosions due to uncontrolled execution
+- Inability to reproduce behaviour reliably
+
+The core issue becomes:
+
+> The system can evolve in ways that no one explicitly understands or controls.
+
+## Reclaiming Ownership
+
+Ownership must shift from code-level understanding to system-level control.
+
+### Define Non-Negotiable Constraints
+
+Instead of reviewing everything, define what must always be true:
+
+- Data pipelines must be replayable (e.g. the same way CDC pipelines require deterministic reprocessing via append-only raw tables, watermark-based processing to understand what changed, see: [cdc-data-platform-reference](https://github.com/olivierbenard/cdc-data-platform-reference))
+- External calls must be bounded (retries, cost)
+- Every dataset must have an owner and lineage
+
+These constraints act as guardrails for both humans and LLMs.
+
+In LLM-driven systems, constraints shift from database-level guarantees (e.g. primary keys, foreign keys, `NOT NULL`, indexes) to system-guarantees (cost, retries, reproducibility) but the principle remains identical. The aim is always to bound behaviour.
+
+### Enforce Explicit Interfaces
+
+Ambiguity is the primary source of drift.
+
+Use:
+- strict schemas
+- typed interfaces
+- versioned contracts
+
+LLMs perform well within clearly defined boundaries. Without them, they introduce silent inconsistencies.
+
+### Reduce the Surface of Free-Form Generation
+
+Avoid generating entire systems.
+
+Prefer:
+- constrained functions
+- well-defined modules
+- explicit responsibilities
+
+The goal is not to limit productivity, but to preserve coherence.
+
+### Treat Generated Code as Untrusted
+
+LLM-generated code should be treated like untrusted external contributions:
+
+- it must be tested
+- it must be validated
+- it must be observable
+
+Speed does not replace verification.
+
+### Shift Ownership to Behaviour
+
+You do not need to understand every line of code.
+
+You must understand and control:
+
+- how the system behaves
+- how it fails
+- how much it costs
+- how it evolves over time
+
+This is the real ownership layer.
+
+### Ensure System Visibility
+
+If you cannot answer:
+
+- what ran
+- what changed
+- what it cost
+- why it failed
+
+then you do not own the system.
+
+Observability is no longer optional in LLM-driven environments.
+
+### Enforce Reproducibility
+
+Especially in systems involving LLMs:
+
+- version prompts
+- version models
+- version input data
+
+Without reproducibility, debugging becomes guesswork.
+
+## The Deeper Reality
+
+LLMs are not creating technical debt.
+
+They are revealing existing weaknesses:
+
+- implicit assumptions
+- lack of constraints
+- missing observability
+- weak system boundaries
+
+What used to fail slowly now fails fast.
+
+## Implications for System Design
+
+To operate effectively in this environment:
+
+- design systems that tolerate unknown code
+- prioritize constraints over implementation
+- make trade-offs explicit (cost, reliability, speed)
+- build control layers instead of relying on discipline
+
+This is not a tooling shift. It is a shift in how systems must be designed.
+
+## Connection to This Lab
+
+The principles described above are not specific to LLM systems.
+
+They are the same principles that shape how PostgreSQL is used as a multi-workload platform:
+
+- Constraints define what is allowed (schemas and indexes act as system guardrails)
+- Contracts define how components interact (tables and APIs act as interfaces)
+- Append-only and replayability enable trust (similar as how reproducibility is handled in CDC use-cases)
+- Queryability enables observability (system introspection)
+- Workload patterns define cost behaviour (LLM should follow the same OLTP / OLAP execution patterns)
+
+The difference is not conceptual, but operational:
+
+LLMs increase the rate at which systems evolve.
+
+This lab explores how to design data systems that remain predictable under that pressure.
+
+## Final Thought
+
+You do not regain ownership by understanding more code.
+
+You regain ownership by ensuring:
+
+> The system cannot behave in ways you did not explicitly allow.
 
 # Index Fundamentals
 
@@ -373,7 +609,7 @@ Therefore, choosing the right specialization should always be driven by the:
 - latency requirements
 - expected scaling behaviour under load
 
-A short mention must be made around PostgreSQl and Kafka as these are not competing tools but are rather solving different problem in the same architectural ecosystem:
+A short mention must be made around PostgreSQL and Kafka as these are not competing tools but are rather solving different problem in the same architectural ecosystem:
 - PostgreSQL is optimized around state (storage, index maintenance, query execution, transactional guarantees)
 - Kafka / event systems is optimized around data flow (moving data between system reliably, decoupling producers from consumers, allowing replay and fan-out at scale)
 
@@ -389,7 +625,7 @@ GIN's posting lists are expensive to maintain under high write volume. Even with
 
 ## Connection Overhead - PostgresSQL Is Process-Based
 
-PostgreSQl forks a process per connection, not a thread. Each process carries ~5-10MB of overhead. At a few hundred concurrent connections, this becomes a memory problem. A spike in application concurrency translates directly into a spike in PostgreSQL processes, which degrades performance for everyone, not just the newcomers. The standard mitigation is a connection pooler sitting in front of PostgreSQL (e.g. `PgBouncer` in transaction mode).
+PostgreSQL forks a process per connection, not a thread. Each process carries ~5-10MB of overhead. At a few hundred concurrent connections, this becomes a memory problem. A spike in application concurrency translates directly into a spike in PostgreSQL processes, which degrades performance for everyone, not just the newcomers. The standard mitigation is a connection pooler sitting in front of PostgreSQL (e.g. `PgBouncer` in transaction mode).
 
 ## Vacuum and Bloat - MVCC Maintenance Cost
 
