@@ -11,6 +11,14 @@ Its extensibility makes it powerful as it enables support for multi-workload pat
 
 The instinct to reach for a specialised system (e.g. Elasticsearch for search, Redis for caching, InfluxDB for time-series) is often premature. PostgreSQL's extensibility makes it capable of handling most of these workloads natively (at the cost of intentional design choices around indexing, schema layout, and query planning).
 
+Before jumping into implementation, it is therefore important to take the time to lay out a coherent data modelling layer. Data Modelling occurs in three main layers:
+- conceptual
+- logical
+- physical
+each representing a progression from high-level business concepts to technical database implementation. In this reference, the physical constraints chosen inherits from Postgres's benefits and limitations.
+
+These layers define how data is structured, stored and utilized, ensuring data integrity and alignement with business goals.
+
 ## Workload Specializations (not "different databases")
 
 Instead of introducing multiple systems prematurely, many workloads can be handled by specializing PostgreSQL per access pattern:
@@ -35,12 +43,15 @@ Handy in contexts where the workflow is write-heavy.
 
 ## GIN (Generalized Inverted Index)
 
-GIN is fundamentally different from a B-tree.
-It is optimized for `WHERE value CONTAINS element` where an element is mapped to a _list of rows_.  
-Typically, GIN is used when a single column contains **multiple searchable elements** such as:
-* `jsonb` (key-value containment)
-* arrays (membership queries)
-* full-text search (`tsvector`)
+A Generalized Inverted Index (GIN) in Postgres is a specialized index designed to efficiently search for individual elements within composite data structures (`jsonb`, arrays or full-text search documents). It works by mapping specific keys to the rows containing them, enabling fast lookups in unstructured or complexe data.
+
+In more details:  
+* GIN is fundamentally different from a B-tree.
+* It is optimized for `WHERE value CONTAINS element` where an element is mapped to a _list of rows_.  
+* Typically, GIN is used when a single column contains **multiple searchable elements** such as:
+  * `jsonb` (key-value containment)
+  * arrays (membership queries)
+  * full-text search (`tsvector`)
 
 Example:
 ```json
@@ -392,3 +403,35 @@ At scale, this matters in any pipeline where upstream delays are normal (late CD
 ## Single-Node Ceiling - No Horizontal Write Scaling
 
 Everything in this lab runs on a single PostgreSQL node. Read scaling is achievable through streaming replication and read replicas. Write scaling is not (PostgreSQL has no native sharding). At the point where write throughput saturates a single node (typically measured in tens of thousands of transactions per second for mixed OLTP, or ingestion rates in the hundreds of thousands of rows per second for time-series), the architectural boundary shifts.
+
+# To Go Further
+
+The goal of this lab is not to turn PostgreSQL into a universal solution, but to understand where it works, where it degrades, and when architectural boundaries must shift.
+
+The following resources deepen that understanding from different angles:
+
+- _Designing Data-Intensive Applications_ by Martin Kleppmann
+  - Foundations for understanding storage engines, indexing, logs and distributed systems
+  - Helps frame why Postgres works (and where it does not / hit a ceiling)
+  - Critical for reasoning about trade-offs, consistency and scaling limits
+- _Streaming Systems_ by Tyler Akidau et al.
+  - Complement this lab by covering data movement, replayability and correctness over time
+  - Helps understand when PostgreSQL is no longer sufficient as a system backbone
+  - Bridges toward Kafka / Confluent / event-driven systems
+- _PostgreSQL Internals_ by Hironobu Suzuki
+  - Deep dive into MVCC, WAL, vacuum, query planner
+  - Explains why issues like bloat, vacuum lag and connection overhead emerge
+  - Essential to move from "symptom fixing" to root-cause understanding
+  - Useful when debugging real production issues
+  - Link: https://www.interdb.jp/pg/
+- _NoSQL Distilled_ by J.R. Storment & Mike Fuller
+  - Not about abandoning SQL but understanding when relational models break down
+  - Helps reason about JSONB usage, docuemnt patterns and schema flexibility
+  - Good mental model for choosing access patterns over technologies
+- _Cloud FinOps_ by J.R. Storment & Mike Fuller
+  - Connects architecture decisions to cost behaviour and accountability
+  - Reinforces why "just using Postgres for everything" can become a financial risk at scale
+
+This lab should be read alongside these materials with a specific lens. The goal is not to memorize tools but to understand how access patterns drive systems design, cost and failure modes.
+
+If this lab shows how far PostgreSQL can go, these resources explain why it eventually should not go further.
